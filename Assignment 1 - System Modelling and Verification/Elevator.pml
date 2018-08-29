@@ -86,13 +86,17 @@ proctype controller(chan output) {
 
 proctype destinationButton(int floor) {
     do  
-    :: floor != currElevatorFloor -> destinations[floor] = true
+    :: atomic {
+        floor != currElevatorFloor -> destinations[floor] = true
+    }
     od
 }
 
 proctype floorButton(int floor) {
     do  
-    :: floor != currElevatorFloor -> requests[floor] = true
+    :: atomic {
+        floor != currElevatorFloor -> requests[floor] = true
+    }
     od
 }
 
@@ -106,4 +110,14 @@ init {
     do
     :: i < numFloors -> run destinationButton(i); run floorButton(i); i++ 
     od
+}
+
+ltl liveRequest { ([](requests[0] -> <>!requests[0])) 
+    && ([](requests[1] -> <>!requests[1]))
+    && ([](requests[2] -> <>!requests[2])) 
+}
+
+ltl liveDestination { ([](destinations[0] -> <>!destinations[0])) 
+    && ([](destinations[1] -> <>!destinations[1]))
+    && ([](destinations[2] -> <>!destinations[2])) 
 }
