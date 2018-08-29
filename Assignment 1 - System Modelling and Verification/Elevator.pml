@@ -1,4 +1,4 @@
-#define FLOORS 3
+#define numFloors 3
 
 mtype { moveUP, moveDOWN, waitUP, waitDOWN };
 // 0 - resting, looking for button press above
@@ -8,17 +8,27 @@ mtype { moveUP, moveDOWN, waitUP, waitDOWN };
 
 chan controlToElevator = [0] of {mtype};
 
-// global elevator variables - the floor, the doors and the buttons pressed
-int currFloor = 0;
+// elevator variables - the floor, the doors and the buttons pressed
+int currElevatorFloor = 0;
 bool isDoorOpen = true;
-bool destination[FLOORS];
+bool destinations[numFloors];
+
+// the "request elevator" button on each floor
+bool requests[numFloors];
+
 
 proctype elevator(chan control) {
+    byte state;
     do 
-    :: control ? waitUP -> isDoorOpen = true; 
-    :: control ? moveUP -> isDoorOpen = false; 
-    :: control ? moveDOWN -> isDoorOpen = false; 
-    :: control ? waitDOWN -> isDoorOpen = true; 
+    ::  control ? state;
+        if
+            :: state == waitUP -> isDoorOpen = true; 
+            :: state == moveUP -> isDoorOpen = false; 
+            :: state == waitDOWN -> isDoorOpen = true;
+            :: state == moveDOWN -> isDoorOpen = false; 
+        fi
+    // door is closed when elevator moves
+    :: assert ((state != moveUP || !isDoorOpen) || (state != moveDOWN || !isDoorOpen))
     od
 }
 
@@ -26,43 +36,47 @@ proctype controller(chan output) {
     byte controlState  = waitUP;
     do
     :: controlState == waitUP ->
+        progressWUP:
         atomic { 
-            int i = currFloor + 1;
+            int i = currElevatorFloor + 1;
             do  
             // on the top, look for presses below
-            :: i == FLOORS -> controlState = waitDOWN -> output ! controlState; break
+            :: i == numFloors -> controlState = waitDOWN; break
             // button press above, start moving up
-            :: i < FLOORS && destination[i] -> 
+            :: i < numFloors && (destinations[i] || requests[i])-> 
                 controlState = moveUP -> output ! controlState; break
             :: else -> i++;
             od
         }
     :: controlState == moveUP ->
         atomic { 
-            currFloor++;
-            if  // check destination & stop, else keep moving
-                :: destination[currFloor] -> 
-                    controlState = waitUP -> output ! controlState; destination[currFloor] = false
+            currElevatorFloor++;
+            if  // check destinations & stop, else keep moving
+                :: (destinations[currElevatorFloor] || requests[currElevatorFloor]) -> 
+                    controlState = waitUP -> output ! controlState; 
+                    destinations[currElevatorFloor] = false; requests[currElevatorFloor] = false;
                 :: else -> skip
             fi
         }
     :: controlState == moveDOWN ->
         atomic { 
-            currFloor--;
-            if  // check destination & stop, else keep moving
-                :: destination[currFloor] -> 
-                    controlState = waitDOWN -> output ! controlState; destination[currFloor] = false
+            currElevatorFloor--;
+            if  // check destinations & stop, else keep moving
+                :: (destinations[currElevatorFloor] || requests[currElevatorFloor])-> 
+                    controlState = waitDOWN -> output ! controlState;
+                    destinations[currElevatorFloor] = false; requests[currElevatorFloor] = false;
                 :: else -> skip
             fi
         }
     :: controlState == waitDOWN ->
+        progressWDOWN:
         atomic { 
-            int i = currFloor - 1;
+            int i = currElevatorFloor - 1;
             do  
             // at the bottom, look for presses above
-            :: i < 0 -> controlState = waitUP -> output ! controlState; break
+            :: i < 0 -> controlState = waitUP; break
             // button press below, start moving down
-            :: i >= 0 && destination[i] -> 
+            :: i >= 0 && (destinations[i] || requests[i]) -> 
                 controlState = moveDOWN -> output ! controlState; break
             :: else -> i--;
             od
@@ -70,19 +84,26 @@ proctype controller(chan output) {
     od
 }
 
+proctype destinationButton(int floor) {
+    do  
+    :: floor != currElevatorFloor -> destinations[floor] = true
+    od
+}
+
 proctype floorButton(int floor) {
     do  
-        :: atomic { floor != currFloor -> destination[floor] = true }
-        :: true -> skip
+    :: floor != currElevatorFloor -> requests[floor] = true
     od
 }
 
 init {
+    // start the controller and the elevator
     run controller(controlToElevator);
     run elevator(controlToElevator);
 
+    // start the button processes for each floor
     int i = 0;
     do
-        :: i < FLOORS -> run floorButton(i); i++ 
+    :: i < numFloors -> run destinationButton(i); run floorButton(i); i++ 
     od
 }
