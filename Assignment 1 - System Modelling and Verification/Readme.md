@@ -1,9 +1,9 @@
 ## Elevator System
 
-#### Structure
+#### Code Structure
 
-* Processes for the elevator controller, the actual lift and *all* the buttons - the request button on each floor and the destination buttons inside the elevator
-* Controller keeps a state machine for the elevator and is responsible for deciding the next move, the elevator itself will open/close doors depending on the state
+* There are processes for the elevator controller, the actual lift and *all* the buttons - the request button on each floor and the destination buttons inside the elevator
+* The controller keeps a state machine for the elevator and is responsible for deciding the next move, the elevator process will open/close doors depending on the state
 * All button processes are pretty much the same
 
 #### Running the code

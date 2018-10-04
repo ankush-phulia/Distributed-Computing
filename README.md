@@ -1,4 +1,4 @@
-# Distributed-Computing
+# Distributed Computing
 
 Projects done in COL 830 - Distributed Computing, 2018
 
