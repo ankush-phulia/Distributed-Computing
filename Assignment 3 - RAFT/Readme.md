@@ -1,8 +1,8 @@
 ## In Search of an Understandable Consensus Algorithm
 
-#### Ankush Phulia, 2014CS50279
+#### Presented by Ankush Phulia, 2014CS50279
 
-***
+
 
 ### Introduction
 

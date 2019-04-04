@@ -1,4 +1,4 @@
-#### COV 880 - Assignment 1
+#### Assignment 1
 
 Write an MPI program to implement the broadcast and reduce collectives on a 2D mesh using `MPI_Send` and `MPI_Receive` (Do not use other routines for communicating data). Combine these to implement the `allreduce` collective. 
 
