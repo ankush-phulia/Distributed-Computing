@@ -1,6 +1,6 @@
 #include "util.h"
 
-#include <math.h> 
+#include <math.h>
 
 MPI_Comm createSquareMesh(MPI_Comm comm) {
     int numProcs = getNumProcs(comm);

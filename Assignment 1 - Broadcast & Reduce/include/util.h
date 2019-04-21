@@ -3,6 +3,8 @@
 
 #include <mpi.h>
 
+enum direction { LEFT = -1, RIGHT = 1 }; 
+
 inline int getGlobalRank() {
     int globalRank;
     MPI_Comm_rank(MPI_COMM_WORLD, &globalRank);
