@@ -97,3 +97,79 @@ void broadcastPlanar(void *data, int count, MPI_Datatype type, int root, MPI_Com
     }
     broadcastLinear(data, count, type, rootRow, colComm);
 }
+
+
+void reduce(int *send_data, int count, int (*op)(int, int), int *recv_data, bool combine=false) {
+    int temp = *send_data;
+    if (combine) {
+        temp = op(temp, *recv_data);
+    }
+    
+    for (int i = 1; i < count; i++) {
+        temp = op(send_data[i], temp);
+    }
+    *recv_data = temp;
+}
+
+void chainReduce(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), int root, MPI_Comm comm, direction dir) {
+    if ((root <= 0 && dir == LEFT) || (root >= getNumProcs(comm) - 1 && dir == RIGHT)) {
+        reduce(send_data, count, op, recv_data);
+        return;
+    }
+
+    chainReduce(send_data, recv_data, count, type, op, root + dir, comm, dir);
+
+    int localRank = getLocalRank(comm);
+    if (localRank == root) {
+        int temp;
+        MPI_Recv(&temp, 1, type, root + dir, 0, comm, MPI_STATUS_IGNORE);
+        reduce(send_data, count, op, &temp, true);
+        *recv_data = temp;
+    }
+    else if (localRank == root + dir) {
+        MPI_Send(recv_data, count, type, root, 0, comm);
+        cout << getGlobalRank() << " sends\n";
+    }
+}
+
+void reduceLinear(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), int root, MPI_Comm comm) {
+    if (root == 0) {
+        chainReduce(send_data, recv_data, count, type, op, root, comm, RIGHT);
+    }
+    else if (root == getNumProcs(comm) - 1) {
+        chainReduce(send_data, recv_data, count, type, op, root, comm, LEFT);
+    }
+    else {
+        chainReduce(send_data, recv_data, count, type, op, root, comm, RIGHT);
+        chainReduce(recv_data, recv_data, count, type, op, root, comm, LEFT);
+    }
+}
+
+void reducePlanar(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), int root, MPI_Comm comm) {
+    // Get mesh dimensions
+    int dims[2], periods[2], procCoords[2];
+    MPI_Cart_get(comm, 2, dims, periods, procCoords);
+    int rootRow = root / dims[0], rootCol = root % dims[0];
+    
+    // split communicator into row and column ones
+    MPI_Comm rowComm, colComm;
+    MPI_Comm_split(comm, procCoords[0], procCoords[1], &rowComm);
+    MPI_Comm_split(comm, procCoords[1], procCoords[0], &colComm);
+
+    int temp = 0;
+    reduceLinear(send_data, &temp, count, type, op, rootRow, colComm);
+
+    int localRank = getLocalRank(comm);
+    if (localRank / dims[0] == rootRow ) {
+        reduceLinear(&temp, recv_data, 1, type, op, rootCol, rowComm);
+    }
+}
+
+
+void allReduceLinear(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), MPI_Comm comm) {
+
+}
+
+void allReducePlanar(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), MPI_Comm comm) {
+
+}

@@ -6,4 +6,7 @@
 void broadcastLinear(void *data, int count, MPI_Datatype type, int root, MPI_Comm comm);
 void broadcastPlanar(void *data, int count, MPI_Datatype type, int root, MPI_Comm comm);
 
+void reduceLinear(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), int root, MPI_Comm comm);
+void reducePlanar(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), int root, MPI_Comm comm);
+
 #endif

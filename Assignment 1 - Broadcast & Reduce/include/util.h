@@ -5,6 +5,7 @@
 
 enum direction { LEFT = -1, RIGHT = 1 }; 
 
+// MPI Operations 
 inline int getGlobalRank() {
     int globalRank;
     MPI_Comm_rank(MPI_COMM_WORLD, &globalRank);
@@ -24,5 +25,23 @@ inline int getNumProcs(MPI_Comm comm) {
 }
 
 MPI_Comm createSquareMesh(MPI_Comm comm);
+
+
+// Reduce operators
+inline int sum(int op1, int op2) {
+    return op1 + op2;
+}
+
+inline int prod(int op1, int op2) {
+    return op1 * op2;
+}
+
+inline int min(int op1, int op2) {
+    return op1 < op2 ? op1 : op2;
+}
+
+inline int max(int op1, int op2) {
+    return op1 < op2 ? op2 : op1;
+}
 
 #endif
