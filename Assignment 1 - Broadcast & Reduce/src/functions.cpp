@@ -104,7 +104,7 @@ void reduce(int *send_data, int count, int (*op)(int, int), int *recv_data, bool
     if (combine) {
         temp = op(temp, *recv_data);
     }
-    
+
     for (int i = 1; i < count; i++) {
         temp = op(send_data[i], temp);
     }
@@ -167,9 +167,22 @@ void reducePlanar(int *send_data, int *recv_data, int count, MPI_Datatype type, 
 
 
 void allReduceLinear(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), MPI_Comm comm) {
-
+    int root = getNumProcs(comm) / 2;
+    reduceLinear(send_data, recv_data, count, MPI_INT, op, root, comm);
+    broadcastLinear(recv_data, 1, MPI_INT, root, comm);
 }
 
 void allReducePlanar(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), MPI_Comm comm) {
+    // Get mesh dimensions
+    int dims[2], periods[2], procCoords[2];
+    MPI_Cart_get(comm, 2, dims, periods, procCoords);
 
+    // split communicator into row and column ones
+    MPI_Comm rowComm, colComm;
+    MPI_Comm_split(comm, procCoords[0], procCoords[1], &rowComm);
+    MPI_Comm_split(comm, procCoords[1], procCoords[0], &colComm);
+
+    int temp = 0;
+    allReduceLinear(send_data, &temp, count, type, op, colComm);
+    allReduceLinear(&temp, recv_data, 1, type, op, rowComm);
 }

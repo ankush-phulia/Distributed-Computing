@@ -17,13 +17,19 @@ int main(int argc, char *argv[]) {
     int data = 1;
     int result = 0;
 
-    if (string(argv[1]) == "bcast") {
+    if (string(argv[1]) == "broadcast") {
         broadcastPlanar(&data, 1, MPI_INT, stoi(argv[2]), mesh);
     }
     else if (string(argv[1]) == "reduce") {
         int root = stoi(argv[2]);
         reducePlanar(&data, &result, 1, MPI_INT, operator_map[string(argv[3])], root, mesh);
         if (getGlobalRank() == root) {
+            cout << result << endl;
+        }
+    }
+    else if (string(argv[1]) == "allreduce") {
+        allReducePlanar(&data, &result, 1, MPI_INT, operator_map[string(argv[2])], mesh);
+        if (getGlobalRank() == 0) {
             cout << result << endl;
         }
     }
