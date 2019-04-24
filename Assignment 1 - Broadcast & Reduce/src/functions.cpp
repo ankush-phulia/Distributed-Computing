@@ -50,37 +50,43 @@ void broadcastPlanarRec(void *data, int count, MPI_Datatype type, int root, MPI_
 }
 
 
-void chainSend(void *data, int count, MPI_Datatype type, int root, MPI_Comm comm, direction dir) {
+void chainSend(int *data, int index, MPI_Datatype type, int root, MPI_Comm comm, direction dir) {
     if ((root <= 0 && dir == LEFT) || (root >= getNumProcs(comm) - 1 && dir == RIGHT)) {
         return;
     }
 
     int localRank = getLocalRank(comm);
     if (localRank == root) {
-        MPI_Send(data, count, type, root + dir, 0, comm);
+        MPI_Send(&data[index], 1, type, root + dir, index, comm);
         cout << getGlobalRank() << " sends\n";
     }
     else if (localRank == root + dir) {
-        MPI_Recv(data, count, type, root, 0, comm, MPI_STATUS_IGNORE);
+        MPI_Recv(&data[index], 1, type, root, index, comm, MPI_STATUS_IGNORE);
     }
 
-    chainSend(data, count, type, root + dir, comm, dir);
+    chainSend(data, index, type, root + dir, comm, dir);
 }
 
-void broadcastLinear(void *data, int count, MPI_Datatype type, int root, MPI_Comm comm) {
+void broadcastLinear(int *data, int count, MPI_Datatype type, int root, MPI_Comm comm) {
     if (root == 0) {
-        chainSend(data, count, type, root, comm, RIGHT);
+        for (int i = 0; i < count; i++) {
+            chainSend(data, i, type, root, comm, RIGHT);
+        }
     }
     else if (root == getNumProcs(comm) - 1) {
-        chainSend(data, count, type, root, comm, LEFT);
+        for (int i = 0; i < count; i++) {
+            chainSend(data, i, type, root, comm, LEFT);
+        }
     }
     else {
-        chainSend(data, count, type, root, comm, RIGHT);
-        chainSend(data, count, type, root, comm, LEFT);
+        for (int i = 0; i < count; i++) {
+            chainSend(data, i, type, root, comm, RIGHT);
+            chainSend(data, i, type, root, comm, LEFT);
+        }
     }
 }
 
-void broadcastPlanar(void *data, int count, MPI_Datatype type, int root, MPI_Comm comm) {
+void broadcastPlanar(int *data, int count, MPI_Datatype type, int root, MPI_Comm comm) {
     // Get mesh dimensions
     int dims[2], periods[2], procCoords[2];
     MPI_Cart_get(comm, 2, dims, periods, procCoords);
@@ -99,49 +105,42 @@ void broadcastPlanar(void *data, int count, MPI_Datatype type, int root, MPI_Com
 }
 
 
-void reduce(int *send_data, int count, int (*op)(int, int), int *recv_data, bool combine=false) {
-    int temp = *send_data;
-    if (combine) {
-        temp = op(temp, *recv_data);
-    }
-
-    for (int i = 1; i < count; i++) {
-        temp = op(send_data[i], temp);
-    }
-    *recv_data = temp;
-}
-
-void chainReduce(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), int root, MPI_Comm comm, direction dir) {
+void chainReduce(int *send_data, int *recv_data, int index, MPI_Datatype type, int (*op)(int, int), int root, MPI_Comm comm, direction dir) {
     if ((root <= 0 && dir == LEFT) || (root >= getNumProcs(comm) - 1 && dir == RIGHT)) {
-        reduce(send_data, count, op, recv_data);
+        recv_data[index] = send_data[index];
         return;
     }
 
-    chainReduce(send_data, recv_data, count, type, op, root + dir, comm, dir);
+    chainReduce(send_data, recv_data, index, type, op, root + dir, comm, dir);
 
     int localRank = getLocalRank(comm);
     if (localRank == root) {
         int temp;
-        MPI_Recv(&temp, 1, type, root + dir, 0, comm, MPI_STATUS_IGNORE);
-        reduce(send_data, count, op, &temp, true);
-        *recv_data = temp;
+        MPI_Recv(&temp, 1, type, root + dir, index, comm, MPI_STATUS_IGNORE);
+        recv_data[index] = op(send_data[index], temp);
     }
     else if (localRank == root + dir) {
-        MPI_Send(recv_data, count, type, root, 0, comm);
+        MPI_Send(&recv_data[index], 1, type, root, index, comm);
         cout << getGlobalRank() << " sends\n";
     }
 }
 
 void reduceLinear(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), int root, MPI_Comm comm) {
     if (root == 0) {
-        chainReduce(send_data, recv_data, count, type, op, root, comm, RIGHT);
+        for (int i = 0; i < count; i++) {
+            chainReduce(send_data, recv_data, i, type, op, root, comm, RIGHT);
+        }
     }
     else if (root == getNumProcs(comm) - 1) {
-        chainReduce(send_data, recv_data, count, type, op, root, comm, LEFT);
+        for (int i = 0; i < count; i++) {
+            chainReduce(send_data, recv_data, i, type, op, root, comm, LEFT);
+        }
     }
     else {
-        chainReduce(send_data, recv_data, count, type, op, root, comm, RIGHT);
-        chainReduce(recv_data, recv_data, count, type, op, root, comm, LEFT);
+        for (int i = 0; i < count; i++) {
+            chainReduce(send_data, recv_data, i, type, op, root, comm, RIGHT);
+            chainReduce(recv_data, recv_data, i, type, op, root, comm, LEFT);
+        }
     }
 }
 
@@ -156,12 +155,12 @@ void reducePlanar(int *send_data, int *recv_data, int count, MPI_Datatype type, 
     MPI_Comm_split(comm, procCoords[0], procCoords[1], &rowComm);
     MPI_Comm_split(comm, procCoords[1], procCoords[0], &colComm);
 
-    int temp = 0;
-    reduceLinear(send_data, &temp, count, type, op, rootRow, colComm);
+    int *temp = new int[count];
+    reduceLinear(send_data, temp, count, type, op, rootRow, colComm);
 
     int localRank = getLocalRank(comm);
     if (localRank / dims[0] == rootRow ) {
-        reduceLinear(&temp, recv_data, 1, type, op, rootCol, rowComm);
+        reduceLinear(temp, recv_data, count, type, op, rootCol, rowComm);
     }
 }
 
@@ -169,7 +168,7 @@ void reducePlanar(int *send_data, int *recv_data, int count, MPI_Datatype type, 
 void allReduceLinear(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), MPI_Comm comm) {
     int root = getNumProcs(comm) / 2;
     reduceLinear(send_data, recv_data, count, MPI_INT, op, root, comm);
-    broadcastLinear(recv_data, 1, MPI_INT, root, comm);
+    broadcastLinear(recv_data, count, MPI_INT, root, comm);
 }
 
 void allReducePlanar(int *send_data, int *recv_data, int count, MPI_Datatype type, int (*op)(int, int), MPI_Comm comm) {
@@ -182,7 +181,7 @@ void allReducePlanar(int *send_data, int *recv_data, int count, MPI_Datatype typ
     MPI_Comm_split(comm, procCoords[0], procCoords[1], &rowComm);
     MPI_Comm_split(comm, procCoords[1], procCoords[0], &colComm);
 
-    int temp = 0;
-    allReduceLinear(send_data, &temp, count, type, op, colComm);
-    allReduceLinear(&temp, recv_data, 1, type, op, rowComm);
+    int *temp = new int[count];
+    allReduceLinear(send_data, temp, count, type, op, colComm);
+    allReduceLinear(temp, recv_data, count, type, op, rowComm);
 }
