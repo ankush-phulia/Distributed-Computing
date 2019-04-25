@@ -1,7 +1,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#include <mpi.h>
+#include "mpix.h"
 
 enum direction { LEFT = -1, RIGHT = 1 }; 
 

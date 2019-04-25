@@ -20,7 +20,7 @@ void printResult(int *result, int size, int rank) {
 }
 
 int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
+    MPI_xInit(&argc, &argv);
     MPI_Comm mesh = createSquareMesh(MPI_COMM_WORLD);
 
     int size = 5;
@@ -44,7 +44,8 @@ int main(int argc, char *argv[]) {
     else if (string(argv[1]) == "allreduce") {
         allReducePlanar(data, result, size, MPI_INT, operator_map[string(argv[2])], mesh);
         printResult(result, size, 0);
+        printResult(result, size, 10);
     }
 
-    MPI_Finalize();
+    MPI_xFinalize();
 }

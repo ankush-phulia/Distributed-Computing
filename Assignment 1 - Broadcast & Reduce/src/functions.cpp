@@ -13,8 +13,8 @@ void broadcastLinearRec(void *data, int count, MPI_Datatype type, int root, MPI_
     // Send/Receive message from 0th to (n/2)th process
     int localRank = getLocalRank(comm);
     if (localRank == root) {
-        MPI_Send(data, count, type, (root + numProcs / 2) % numProcs, 0, comm);
-        cout << getGlobalRank() << " sends\n";
+        MPI_xSend(data, count, type, (root + numProcs / 2) % numProcs, 0, comm);
+        // cout << getGlobalRank() << " sends\n";
     }
     else if (localRank == (root + numProcs / 2) % numProcs) {
         MPI_Recv(data, count, type, root, 0, comm, MPI_STATUS_IGNORE);
@@ -57,8 +57,8 @@ void chainSend(int *data, int index, MPI_Datatype type, int root, MPI_Comm comm,
 
     int localRank = getLocalRank(comm);
     if (localRank == root) {
-        MPI_Send(&data[index], 1, type, root + dir, index, comm);
-        cout << getGlobalRank() << " sends\n";
+        MPI_xSend(&data[index], 1, type, root + dir, index, comm);
+        // cout << getGlobalRank() << " sends\n";
     }
     else if (localRank == root + dir) {
         MPI_Recv(&data[index], 1, type, root, index, comm, MPI_STATUS_IGNORE);
@@ -120,8 +120,8 @@ void chainReduce(int *send_data, int *recv_data, int index, MPI_Datatype type, i
         recv_data[index] = op(send_data[index], temp);
     }
     else if (localRank == root + dir) {
-        MPI_Send(&recv_data[index], 1, type, root, index, comm);
-        cout << getGlobalRank() << " sends\n";
+        MPI_xSend(&recv_data[index], 1, type, root, index, comm);
+        // cout << getGlobalRank() << " sends\n";
     }
 }
 
